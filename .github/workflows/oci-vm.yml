@@ -8,6 +8,24 @@ jobs:
   check-oci:
     runs-on: ubuntu-latest
     timeout-minutes: 9
+    permissions:
+      contents: read
+    env:
+      SMTP_SENDER: ${{ secrets.SMTP_SENDER }}
+      SMTP_RECIPIENT: ${{ secrets.SMTP_RECIPIENT }}
+      SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+      OCI_USER: ${{ secrets.OCI_USER }}
+      OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+      OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+      OCI_REGION: ${{ secrets.OCI_REGION }}
+      OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
+      OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
+      OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
+      OCI_SHAPE: ${{ secrets.OCI_SHAPE }}
+      OCI_SHAPE_OCPUS: ${{ secrets.OCI_SHAPE_OCPUS }}
+      OCI_SHAPE_MEMORY_GBS: ${{ secrets.OCI_SHAPE_MEMORY_GBS }}
+      OCI_ADS: ${{ secrets.OCI_ADS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,27 +34,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install OCI SDK
-        run: pip install oci==2.180.0
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
 
       - name: Run OCI VM script
-        env:
-          OCI_USER: ${{ secrets.OCI_USER }}
-          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
-          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
-          OCI_REGION: ${{ secrets.OCI_REGION }}
-          OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
-          OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
-          OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
-          OCI_SHAPE: ${{ secrets.OCI_SHAPE }}
-          OCI_SHAPE_OCPUS: ${{ secrets.OCI_SHAPE_OCPUS }}
-          OCI_SHAPE_MEMORY_GBS: ${{ secrets.OCI_SHAPE_MEMORY_GBS }}
-          OCI_ADS: ${{ secrets.OCI_ADS }}
-          SMTP_SENDER: ${{ secrets.SMTP_SENDER }}
-          SMTP_RECIPIENT: ${{ secrets.SMTP_RECIPIENT }}
-          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/oci_vm.py
