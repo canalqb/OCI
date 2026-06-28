@@ -34,14 +34,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install oci==2.180.0
 
       - name: Run OCI VM script
         run: python scripts/oci_vm.py
 
-      - name: Remover logs de execuções bem-sucedidas
+      - name: Remover logs de execucoes bem-sucedidas
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
