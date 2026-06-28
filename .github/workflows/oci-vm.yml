@@ -40,3 +40,37 @@ jobs:
 
       - name: Run OCI VM script
         run: python scripts/oci_vm.py
+
+      - name: Remover logs de execuções bem-sucedidas
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request
+          token = os.environ["GITHUB_TOKEN"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          workflow = "oci-vm.yml"
+          api = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/runs?per_page=50"
+          req = urllib.request.Request(api)
+          req.add_header("Authorization", f"Bearer {token}")
+          req.add_header("Accept", "application/vnd.github+json")
+          req.add_header("User-Agent", "python")
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              data = json.loads(resp.read())
+          runs = data.get("workflow_runs", [])
+          success_ids = [str(r["id"]) for r in runs if r.get("conclusion") == "success"]
+          print(f"Execucoes com sucesso encontradas para remover: {len(success_ids)}")
+          for rid in success_ids[:10]:
+              url = f"https://api.github.com/repos/{repo}/actions/runs/{rid}"
+              req2 = urllib.request.Request(url, method="DELETE")
+              req2.add_header("Authorization", f"Bearer {token}")
+              req2.add_header("Accept", "application/vnd.github+json")
+              req2.add_header("User-Agent", "python")
+              try:
+                  with urllib.request.urlopen(req2, timeout=30) as resp2:
+                      print(f"Removido run {rid}: {resp2.status}")
+              except Exception as e:
+                  print(f"Erro ao remover {rid}: {e}")
+          print("Limpeza de logs concluida.")
+          PY
