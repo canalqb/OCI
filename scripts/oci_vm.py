@@ -38,11 +38,24 @@ def build_virtual_network(config):
     return oci.core.VirtualNetworkClient(config)
 
 
-def build_shape_config():
+def parse_shape_config(ocpus, memory_gbs):
     return oci.core.models.LaunchInstanceShapeConfigDetails(
-        ocpus=int(os.environ["OCI_SHAPE_OCPUS"]),
-        memory_in_gbs=int(os.environ["OCI_SHAPE_MEMORY_GBS"]),
+        ocpus=int(ocpus),
+        memory_in_gbs=int(memory_gbs),
     )
+
+
+def build_shape_config():
+    primary_ocpus = os.environ.get("OCI_SHAPE_OCPUS", "4")
+    primary_memory = os.environ.get("OCI_SHAPE_MEMORY_GBS", "24")
+    fallback_ocpus = os.environ.get("OCI_SHAPE_FALLBACK_OCPUS", primary_ocpus)
+    fallback_memory = os.environ.get("OCI_SHAPE_FALLBACK_MEMORY_GBS", primary_memory)
+    return parse_shape_config(primary_ocpus, primary_memory), parse_shape_config(fallback_ocpus, fallback_memory)
+
+
+def is_fallback_error(e):
+    msg = str(e)
+    return "Out of host capacity" in msg or "InternalError" in msg
 
 
 def send_email(subject, body):
@@ -99,7 +112,7 @@ def main():
     config = build_config()
     compute_client = build_compute(config)
     virtual_network_client = build_virtual_network(config)
-    shape_config = build_shape_config()
+    primary_shape, fallback_shape = build_shape_config()
 
     instance = existing_instance(compute_client)
     if instance:
@@ -108,31 +121,43 @@ def main():
         send_email("hermes-vm: instância existente", build_body(compute_client, virtual_network_client, instance))
         return 0
 
-    for ad in ADS:
-        print(f"Tentando criar VM no {ad} ...")
-        try:
-            details = oci.core.models.LaunchInstanceDetails(
-                compartment_id=COMPARTMENT_ID,
-                availability_domain=ad,
-                shape=SHAPE,
-                shape_config=shape_config,
-                image_id=IMAGE_ID,
-                subnet_id=SUBNET_ID,
-                display_name="hermes-vm",
-                create_vnic_details=oci.core.models.CreateVnicDetails(assign_public_ip=True),
-            )
-            response = compute_client.launch_instance(launch_instance_details=details)
-            instance = response.data
-            print("Instância criada:")
-            print(build_body(compute_client, virtual_network_client, instance))
-            send_email("hermes-vm: instância criada", build_body(compute_client, virtual_network_client, instance))
+    def try_create(shape_config, label):
+        for ad in ADS:
+            print(f"Tentando criar VM no {ad} ({label}) ...")
+            try:
+                details = oci.core.models.LaunchInstanceDetails(
+                    compartment_id=COMPARTMENT_ID,
+                    availability_domain=ad,
+                    shape=SHAPE,
+                    shape_config=shape_config,
+                    image_id=IMAGE_ID,
+                    subnet_id=SUBNET_ID,
+                    display_name="hermes-vm",
+                    create_vnic_details=oci.core.models.CreateVnicDetails(assign_public_ip=True),
+                )
+                response = compute_client.launch_instance(launch_instance_details=details)
+                instance = response.data
+                print("Instância criada:")
+                print(build_body(compute_client, virtual_network_client, instance))
+                send_email(f"hermes-vm: instância criada ({label})", build_body(compute_client, virtual_network_client, instance))
+                return True
+            except Exception as e:
+                msg = str(e)
+                if "Out of host capacity" in msg or "InternalError" in msg:
+                    print(f"Falhou no {ad} ({label}): sem capacidade.")
+                else:
+                    print(f"Falhou no {ad} ({label}): {e}")
+        return False
+
+    if try_create(primary_shape, "4 OCPUs / 24 GB"):
+        return 0
+
+    if (
+        fallback_shape.ocpus != primary_shape.ocpus
+        or fallback_shape.memory_in_gbs != primary_shape.memory_in_gbs
+    ):
+        if try_create(fallback_shape, "2 OCPUs / 12 GB"):
             return 0
-        except Exception as e:
-            msg = str(e)
-            if "Out of host capacity" in msg or "InternalError" in msg:
-                print(f"Falhou no {ad}: sem capacidade.")
-            else:
-                print(f"Falhou no {ad}: {e}")
 
     print("Nenhum AD disponível no momento.")
     return 0
