@@ -1,0 +1,6 @@
+Aqui peguei só o que é necessário do seu .oci. Se quiser verificar manual:
+API key já configurada em C:\Users\Qb\.oci.
+
+Se trocar a chave, terá que atualizar os secrets:
+- OCI_PRIVATE_KEY
+- OCI_FINGERPRINT
