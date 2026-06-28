@@ -1,6 +1,6 @@
-# Guia Rápido: OCI no Windows + Terraform Tier (Free Tier)
+# Guia Rápido: OCI no Windows + Free Tier / PAYG (atualizado 2026)
 
-Este guia é para quem está no Oracle Cloud **Free Tier / Always Free** e quer preparar a conta para usar o script `oci_vm.py` ou criar a instância manualmente.
+A partir de **15 de junho de 2026**, o Oracle Cloud **Always Free** passou para **2 OCPUs e 12 GB de RAM**. Instâncias existentes foram desligadas até o ajuste do shape. Se quiser manter **4 OCPUs e 24 GB** com custo zero (dentro dos limites gratuitos), o caminho é migrar para **Pay As You Go (PAYG)** com **alerta de orçamento** configurado, evitando cobrança.
 
 ---
 
@@ -38,10 +38,11 @@ Responda as perguntas:
 - **User OCID:** idem.
 - **Fingerprint:** da chave pública que você vai gerar.
 - **Path to private key:** caminho do arquivo `.pem`.
-- **Region:** escolha `us-ashburn-1` ou outra que esteja disponível.
+- **Region:** escolha uma região disponível.
 
-> **Nota:** no Free Tier / Always Free, **não é possível trocar a região** depois. A região fica fixa na sua conta. Se precisar mudar, terá que criar nova conta.
-> Consulte sempre na internet e no console quais regiões estão com capacidade para Always Free. Em many cases, **Ashburn (iad)** tem sido a mais estável.
+> **Nota 1:** no Free Tier / Always Free, **não é possível trocar a região** depois. A região fica fixa na sua conta. Se precisar mudar, terá que criar nova conta.
+> **Nota 2:** até 14/06/2026, o Always Free permitia 4 OCPUs e 24 GB no shape ARM `VM.Standard.A1.Flex`. A partir de 15/06/2026, o limite mudou: Always Free passou a **2 OCPUs e 12 GB**. Veja a seção 5.
+> Consulte sempre na internet e no console quais regiões estão com capacidade para Always Free.
 
 ---
 
@@ -150,13 +151,34 @@ Agora sim, com VCN, subredes, Internet Gateway e tabela de rotas prontas, crie a
 
 ---
 
-## 5. Dificuldade para criar instâncias no Free Tier
+## 5. Regra atual: Free Tier vs PAYG (2026)
 
-No Always Free, a oferta padrão é limitada. O shape `VM.Standard.A1.Flex` (baseado em ARM Ampere) com **4 OCPUs e 24 GB** costuma ter capacidade variável por região e por domínio de disponibilidade (AD). É comum receber erro:
+No **Always Free**, os limites atuais são:
+- **Máximo:** 2 OCPUs + 12 GB de RAM
+- Algumas regiões também incluem volumes e bandwidth limitados grátis.
+- O shape `VM.Standard.A1.Flex` pode aparecer como **4 OCPUs / 24 GB** no PAYG (uso pago), porém **não está coberto pelo Always Free**.
+
+Se a oferta anterior era 4 OCPUs / 24 GB (até 14/06/2026), instâncias com essa configuração foram desligadas para adequação. Para manter o tamanho original ou obter mais performance, uma opção é migrar para **Pay As You Go**:
+- Você se inscreve no PAYG e paga apenas pelo que usar.
+- Configure **budget alert** no console OCI (Budget > Budgets > Create Budget) para receber alerta quando se aproximar do limite.
+- Dentro do crédito/limite promocional, pode manter 4 OCPUs / 24 GB sem custo adicional temporariamente.
+- Cada conta Free Tier/PAYG continua sendo **uma por CPF**.
+
+**Resumo prático:**
+- Grátis garantido (sem risco): 2 OCPUs, 12 GB.
+- 4 OCPUs / 24 GB: apenas no PAYG com orçamento alertado.
+
+---
+
+## 6. Dificuldade para criar instâncias no Free Tier / PAYG
+
+No Always Free, a oferta é limitada. No PAYG com 4 OCPUs / 24 GB, pode haver capacidade, mas risco de custo se não usar budget alert. Por isso este projeto automatiza a criação.
+
+O shape `VM.Standard.A1.Flex` (ARM Ampere) com **4 OCPUs e 24 GB** pode ter capacidade variável por região e por domínio de disponibilidade (AD). É comum receber erro:
 ```
 Out of host capacity
 ```
-Justamente por isso estamos desenvolvendo este script automático: ele fica tentando a cada 10 minutos nos ADs 1, 2 e 3 de `US-ASHBURN-1` até que haja recurso disponível.
+Justamente por isso este script automático fica tentando a cada 10 minutos nos ADs 1, 2 e 3 de `US-ASHBURN-1` até que haja recurso disponível.
 
 ### Pontos importantes:
 - Não crie a instância manualmente antes de preparar a VCN, subnet pública, Internet Gateway e tabelas de rota.
@@ -166,7 +188,7 @@ Justamente por isso estamos desenvolvendo este script automático: ele fica tent
 
 ---
 
-## 6. Resumo dos dados necessários para o GitHub Actions
+## 7. Resumo dos dados necessários para o GitHub Actions
 
 Preencha os Secrets em `https://github.com/canalqb/OCI/settings/secrets/actions`:
 
@@ -184,19 +206,21 @@ Preencha os Secrets em `https://github.com/canalqb/OCI/settings/secrets/actions`
 | `OCI_SUBNET_ID` | OCID da subnet pública |
 | `OCI_IMAGE_ID` | OCID da imagem Oracle Linux (compatible with A1) |
 | `OCI_SHAPE` | `VM.Standard.A1.Flex` |
-| `OCI_SHAPE_OCPUS` | `4` |
-| `OCI_SHAPE_MEMORY_GBS` | `24` |
+| `OCI_SHAPE_OCPUS` | `4` (caso deseje 4 OCPUs; lembrando que Free Tier atual limita a 2) |
+| `OCI_SHAPE_MEMORY_GBS` | `24` (idem; dentro do Always Free atual o limite é 12 GB) |
 | `OCI_ADS` | `qRwa:US-ASHBURN-AD-1,qRwa:US-ASHBURN-AD-2,qRwa:US-ASHBURN-AD-3` |
+
+> Se você decidir manter-se no **Always Free puro**, ajuste os valores para 2 OCPUs / 12 GB conforme o limite atual.
 
 ---
 
-## 7. Próximos passos
+## 8. Próximos passos
 
-1. Instal o OCI CLI no Windows (seção 1).
+1. Instale o OCI CLI no Windows (seção 1).
 2. Rode `oci setup config` e gere as API Keys (seção 2 e 3.4).
 3. Crie VCN, subredes, Internet Gateway e regras (seção 4).
 4. Pegue todos os OCIDs necessários (seção 3).
-5. Preencha os Secrets no GitHub (seção 6).
+5. Preencha os Secrets no GitHub (seção 7).
 6. O GitHub Actions vai rodar sozinho a cada 10 minutos; quando houver espaço, a instância será criada e você receberá e-mail.
 
 ---
@@ -205,3 +229,6 @@ Dúvidas comuns:
 - **Posso mudar de região depois?** Não, no tier não. Planeje antes.
 - **Posso expandir sem pagar?** Mantenha-se nos limites Always Free.
 - **E se eu deletar a instância?** O script recria, mas se ela foi criada e depois deletada só por falta de rede configurada, o slot pode demorar mais para liberar.
+- **Mantenho Always Free ou PAYG?** 
+  - Grátis garantido: siga com 2 OCPUs / 12 GB.
+  - Máximo desempenho (4 OCPUs / 24 GB): migre para PAYG com alerta de orçamento configurado.
