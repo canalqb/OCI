@@ -135,7 +135,7 @@ def main():
                 print(f"Falhou no {ad}: {e}")
 
     print("Nenhum AD disponível no momento.")
-    return 1
+    return 0
 
 
 if __name__ == "__main__":
